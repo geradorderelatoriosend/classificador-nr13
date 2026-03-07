@@ -118,11 +118,17 @@ def kgf_cm2_para_mpa(pressao_kgf_cm2: float) -> float:
     return pressao_kgf_cm2 * 0.0980665
 
 
-def calcular_pv(pressao_kgf_cm2: float, volume_litros: float) -> tuple[float, float, float]:
+def kgf_cm2_para_kpa(pressao_kgf_cm2: float) -> float:
+    return pressao_kgf_cm2 * 98.0665
+
+
+def calcular_pv(pressao_kgf_cm2: float, volume_litros: float) -> tuple[float, float, float, float]:
     pressao_mpa = kgf_cm2_para_mpa(pressao_kgf_cm2)
+    pressao_kpa = kgf_cm2_para_kpa(pressao_kgf_cm2)
     volume_m3 = litros_para_m3(volume_litros)
-    pv = pressao_mpa * volume_m3
-    return pressao_mpa, volume_m3, pv
+    pv_categoria = pressao_mpa * volume_m3
+    pv_enquadramento = pressao_kpa * volume_m3
+    return pressao_mpa, pressao_kpa, volume_m3, pv_categoria, pv_enquadramento
 
 
 def formatar_numero_br(valor: float, casas: int = 2) -> str:
@@ -264,20 +270,27 @@ if submitted:
             fluido_especial=tipo_especial,
         )
 
-        pressao_mpa, volume_m3, pv = calcular_pv(pressao, volume)
-        grupo = classificar_grupo_potencial_risco(pv)
-        categoria = classificar_categoria(classe, grupo)
+        pressao_mpa, pressao_kpa, volume_m3, pv_categoria, pv_enquadramento = calcular_pv(pressao, volume)
+        enquadrado_nr13 = pv_enquadramento > 8 or classe == "Classe A"
+        grupo = classificar_grupo_potencial_risco(pv_categoria)
+        categoria = classificar_categoria(classe, grupo) if enquadrado_nr13 else "Não aplicável"
 
         st.subheader("Resultado")
-        st.success(f"{classe} | {grupo} | {categoria}")
+        if enquadrado_nr13:
+            st.success(f"Enquadrado na NR-13 | {classe} | {grupo} | {categoria}")
+        else:
+            st.warning(f"Não enquadrado na NR-13 | {classe} | Grupo/Categoria não aplicáveis")
 
         st.markdown("### Resumo")
         st.write(f"**Fluido selecionado:** {fluido_nome}")
         st.write(f"**Pressão máxima de operação:** {formatar_numero_br(pressao, 2)} kgf/cm²")
         st.write(f"**Volume interno:** {formatar_numero_br(volume, 2)} litros")
-        st.write(f"**Pressão convertida:** {formatar_numero_br(pressao_mpa, 6)} MPa")
+        st.write(f"**Pressão convertida para grupo/categoria:** {formatar_numero_br(pressao_mpa, 6)} MPa")
+        st.write(f"**Pressão convertida para enquadramento NR-13:** {formatar_numero_br(pressao_kpa, 2)} kPa")
         st.write(f"**Volume convertido:** {formatar_numero_br(volume_m3, 6)} m³")
-        st.write(f"**Produto P.V:** {formatar_numero_br(pv, 6)}")
+        st.write(f"**P.V para enquadramento NR-13:** {formatar_numero_br(pv_enquadramento, 6)} kPa·m³")
+        st.write(f"**P.V para grupo/categoria:** {formatar_numero_br(pv_categoria, 6)} MPa·m³")
+        st.write(f"**Enquadrado na NR-13:** {'Sim' if enquadrado_nr13 else 'Não'}")
 
         st.markdown("### Critérios automáticos")
         st.write(f"**Inflamável:** {'Sim' if inflamavel else 'Não'}")
